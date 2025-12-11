@@ -86,6 +86,13 @@ final class MyBurpInterceptorTests: XCTestCase {
         let serverURL = URL(string: "http://localhost:8080")!
         MyBurp.configureServer(url: serverURL, enabled: true)
         
+        // Wait for async configuration to complete
+        let expectation = XCTestExpectation(description: "Wait for configuration")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            expectation.fulfill()
+        }
+        wait(for: [expectation], timeout: 1.0)
+        
         // Verify configuration was set
         XCTAssertEqual(NetworkInterceptor.shared.serverURL, serverURL)
         XCTAssertTrue(NetworkInterceptor.shared.isServerEnabled)

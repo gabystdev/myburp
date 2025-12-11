@@ -10,7 +10,7 @@ public class NetworkInterceptor {
     
     private var transactions: [NetworkTransaction] = []
     private let queue = DispatchQueue(label: "com.myburp.interceptor", attributes: .concurrent)
-    private var requestMap: [String: RequestModel] = [:]
+    private var transactionMap: [UUID: Int] = [:]  // Maps request ID to transaction index
     
     /// Configuration for the desktop server
     public var serverURL: URL?
@@ -49,7 +49,7 @@ public class NetworkInterceptor {
     public func clearTransactions() {
         queue.async(flags: .barrier) {
             self.transactions.removeAll()
-            self.requestMap.removeAll()
+            self.transactionMap.removeAll()
         }
     }
     
@@ -57,12 +57,11 @@ public class NetworkInterceptor {
     
     func recordRequest(_ request: RequestModel) {
         queue.async(flags: .barrier) {
-            // Store the request for later matching with response
-            let key = "\(request.url)_\(request.timestamp.timeIntervalSince1970)"
-            self.requestMap[key] = request
-            
             let transaction = NetworkTransaction(request: request)
             self.transactions.append(transaction)
+            
+            // Map request ID to transaction index for efficient lookup
+            self.transactionMap[request.id] = self.transactions.count - 1
             
             // Send to desktop server if configured
             if self.isServerEnabled {
@@ -71,33 +70,21 @@ public class NetworkInterceptor {
         }
     }
     
-    func recordResponse(_ response: ResponseModel) {
+    func recordResponse(_ response: ResponseModel, for requestID: UUID) {
         queue.async(flags: .barrier) {
-            // Try to match response with its request
-            // In a real implementation, you'd have a better matching mechanism
-            if let lastTransaction = self.transactions.last,
-               lastTransaction.response == nil {
-                var updatedTransaction = lastTransaction
-                var updatedResponse = response
-                updatedResponse = ResponseModel(
-                    id: updatedResponse.id,
-                    requestId: lastTransaction.request.id,
-                    statusCode: updatedResponse.statusCode,
-                    headers: updatedResponse.headers,
-                    body: updatedResponse.body,
-                    timestamp: updatedResponse.timestamp,
-                    duration: updatedResponse.duration
-                )
-                updatedTransaction.response = updatedResponse
-                
-                if let index = self.transactions.firstIndex(where: { $0.id == lastTransaction.id }) {
-                    self.transactions[index] = updatedTransaction
-                }
-                
-                // Send updated transaction to server
-                if self.isServerEnabled {
-                    self.sendToServer(transaction: updatedTransaction)
-                }
+            // Find the transaction by request ID
+            guard let index = self.transactionMap[requestID],
+                  index < self.transactions.count else {
+                return
+            }
+            
+            var updatedTransaction = self.transactions[index]
+            updatedTransaction.response = response
+            self.transactions[index] = updatedTransaction
+            
+            // Send updated transaction to server
+            if self.isServerEnabled {
+                self.sendToServer(transaction: updatedTransaction)
             }
         }
     }

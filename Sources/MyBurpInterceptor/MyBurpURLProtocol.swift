@@ -10,6 +10,7 @@ public class MyBurpURLProtocol: URLProtocol {
     private var dataTask: URLSessionDataTask?
     private var receivedData: Data?
     private var startTime: Date?
+    private var requestID: UUID?
     
     // MARK: - URLProtocol Override Methods
     
@@ -90,11 +91,14 @@ public class MyBurpURLProtocol: URLProtocol {
             body: request.httpBody
         )
         
+        // Store the request ID for later matching with response
+        requestID = requestModel.id
         NetworkInterceptor.shared.recordRequest(requestModel)
     }
     
     private func captureResponse(_ response: HTTPURLResponse, data: Data?) {
         guard let startTime = startTime else { return }
+        guard let requestID = requestID else { return }
         let duration = Date().timeIntervalSince(startTime)
         
         let headers = response.allHeaderFields.reduce(into: [String: String]()) { result, element in
@@ -102,13 +106,13 @@ public class MyBurpURLProtocol: URLProtocol {
         }
         
         let responseModel = ResponseModel(
-            requestId: UUID(), // This would need to be matched with the request
+            requestId: requestID,
             statusCode: response.statusCode,
             headers: headers,
             body: data,
             duration: duration
         )
         
-        NetworkInterceptor.shared.recordResponse(responseModel)
+        NetworkInterceptor.shared.recordResponse(responseModel, for: requestID)
     }
 }
