@@ -110,6 +110,7 @@ final class HTTPHandler: ChannelInboundHandler {
     }
     
     private func handleRoot(context: ChannelHandlerContext, head: HTTPRequestHead) {
+        let transactionCount = TransactionStore.shared.count()
         let html = """
         <!DOCTYPE html>
         <html>
@@ -126,7 +127,7 @@ final class HTTPHandler: ChannelInboundHandler {
             <h1>MyBurp Server Running 🚀</h1>
             <div class="info">
                 <p><strong>Status:</strong> Active</p>
-                <p><strong>Intercepted Transactions:</strong> \(TransactionStore.shared.getAll().count)</p>
+                <p><strong>Intercepted Transactions:</strong> \(transactionCount)</p>
                 <h3>API Endpoints:</h3>
                 <ul>
                     <li><code>POST /intercept</code> - Receive intercepted transactions</li>

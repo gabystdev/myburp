@@ -243,7 +243,10 @@ curl http://localhost:8080/ | grep "Intercepted Transactions"
 **Physical Device:**
 1. Get your Mac's IP address:
    ```bash
+   # macOS - check which interface (en0, en1, etc.) is active
    ipconfig getifaddr en0
+   # or use
+   ifconfig | grep "inet " | grep -v 127.0.0.1
    ```
 2. Use that IP: `http://192.168.1.100:8080`
 3. Make sure Mac and device are on same WiFi

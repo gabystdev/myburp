@@ -15,6 +15,8 @@ let server = MyBurpHTTPServer(port: port)
 // Handle graceful shutdown
 signal(SIGINT) { _ in
     print("\n\n👋 Shutting down gracefully...")
+    // Note: We can't call server.stop() from signal handler safely
+    // The server will be cleaned up on process exit
     exit(0)
 }
 
