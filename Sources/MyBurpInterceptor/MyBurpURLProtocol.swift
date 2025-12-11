@@ -38,7 +38,12 @@ public class MyBurpURLProtocol: URLProtocol {
         
         // Create a mutable copy of the request and mark it as handled
         guard let newRequest = (request as NSURLRequest).mutableCopy() as? NSMutableURLRequest else {
-            client?.urlProtocol(self, didFailWithError: NSError(domain: NSURLErrorDomain, code: NSURLErrorUnknown))
+            let error = NSError(
+                domain: NSURLErrorDomain,
+                code: NSURLErrorUnknown,
+                userInfo: [NSLocalizedDescriptionKey: "Failed to create mutable copy of URLRequest"]
+            )
+            client?.urlProtocol(self, didFailWithError: error)
             return
         }
         

@@ -22,7 +22,10 @@ public class NetworkInterceptor {
     
     /// Start intercepting network requests
     public func startIntercepting() {
-        _ = URLProtocol.registerClass(MyBurpURLProtocol.self)
+        let success = URLProtocol.registerClass(MyBurpURLProtocol.self)
+        if !success {
+            print("MyBurp: Warning - Failed to register URLProtocol. It may already be registered.")
+        }
     }
     
     /// Stop intercepting network requests
