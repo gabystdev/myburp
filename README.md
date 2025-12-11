@@ -1,21 +1,22 @@
-# MyBurp - iOS Network Interceptor
+# MyBurp - iOS Network Interceptor + Desktop Server
 
 A lightweight iOS network interceptor library similar to Wormholy, designed to capture and forward HTTP/HTTPS requests to a desktop application for inspection and modification.
 
 ## Features
 
 - 🔍 **Network Interception**: Automatically intercept all HTTP/HTTPS requests made by your iOS app
-- 📡 **Desktop Server Integration**: Forward intercepted traffic to a desktop application
+- 📡 **Desktop Server**: NIO-based HTTP server for receiving intercepted traffic
 - 🚀 **Simple API**: Easy to integrate with just a few lines of code
 - 🧪 **Lightweight**: Minimal implementation without unnecessary overhead
 - 📦 **Swift Package Manager**: Easy integration via SPM
+- 🖥️ **REST API**: Query and manage intercepted transactions
 
 ## Architecture
 
 MyBurp consists of two main components:
 
-1. **iOS Interceptor Library** (This Package): Captures network traffic and sends it to a desktop server
-2. **Desktop Server Application** (Future Implementation): Receives, displays, and allows modification of requests/responses
+1. **iOS Interceptor Library**: Captures network traffic and sends it to a desktop server
+2. **Desktop Server Application**: NIO-based HTTP server that receives and stores intercepted traffic
 
 ## Installation
 
@@ -199,13 +200,60 @@ Content-Type: application/json
 - Swift 5.9+
 - Xcode 15.0+
 
+## Desktop Server
+
+### Running the Server
+
+```bash
+# Build and run
+swift run MyBurpServer
+
+# Or run the built binary
+.build/debug/MyBurpServer
+```
+
+The server will start on port 8080 by default. You can customize the port:
+
+```bash
+PORT=9090 swift run MyBurpServer
+```
+
+### Server API
+
+The server provides these endpoints:
+
+- `POST /intercept` - Receive intercepted transactions from iOS apps
+- `GET /transactions` - Get all stored transactions
+- `DELETE /transactions` - Clear all transactions
+- `GET /` - Web interface showing server status
+
+### Example Usage
+
+```bash
+# Start server
+swift run MyBurpServer
+
+# In your iOS app
+MyBurp.configureServer(url: URL(string: "http://localhost:8080")!)
+
+# Query transactions from command line
+curl http://localhost:8080/transactions | jq
+
+# Clear transactions
+curl -X DELETE http://localhost:8080/transactions
+```
+
+See [MyBurpServer README](Sources/MyBurpServer/README.md) for detailed documentation.
+
 ## Development Roadmap
 
 - [x] Basic network interception using URLProtocol
 - [x] Request/Response data models
 - [x] Desktop server communication
 - [x] Swift Package Manager support
-- [ ] Desktop server application (SwiftUI + NIO)
+- [x] NIO-based HTTP server
+- [x] REST API for transaction management
+- [ ] SwiftUI desktop app UI
 - [ ] Request/Response modification interface
 - [ ] WebSocket support for real-time updates
 - [ ] Filtering and search capabilities
