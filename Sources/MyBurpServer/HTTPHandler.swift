@@ -44,8 +44,20 @@ final class HTTPHandler: ChannelInboundHandler {
         case (.POST, "/intercept"):
             handleInterceptEndpoint(context: context, head: head, body: body)
             
+        case (.POST, "/intercept-request"):
+            handleInterceptRequestEndpoint(context: context, head: head, body: body)
+            
+        case (.POST, let uri) where uri.starts(with: "/approve/"):
+            handleApproveRequest(context: context, head: head, uri: uri, body: body)
+            
+        case (.POST, let uri) where uri.starts(with: "/reject/"):
+            handleRejectRequest(context: context, head: head, uri: uri)
+            
         case (.GET, "/transactions"):
             handleGetTransactions(context: context, head: head)
+            
+        case (.GET, "/pending"):
+            handleGetPendingTransactions(context: context, head: head)
             
         case (.DELETE, "/transactions"):
             handleClearTransactions(context: context, head: head)
@@ -87,6 +99,138 @@ final class HTTPHandler: ChannelInboundHandler {
             sendJSON(context: context, statusCode: .ok, data: ["status": "received"])
         } catch {
             sendError(context: context, message: "Failed to decode transaction: \(error.localizedDescription)")
+        }
+    }
+    
+    private func handleInterceptRequestEndpoint(context: ChannelHandlerContext, head: HTTPRequestHead, body: ByteBuffer?) {
+        guard var body = body else {
+            sendError(context: context, message: "No body provided")
+            return
+        }
+        
+        guard let bytes = body.readBytes(length: body.readableBytes) else {
+            sendError(context: context, message: "Failed to read body data")
+            return
+        }
+        
+        let data = Data(bytes)
+        
+        do {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            let interceptRequest = try decoder.decode(InterceptRequest.self, from: data)
+            
+            print("🔒 Intercepted Request: \(interceptRequest.request.method) \(interceptRequest.request.url)")
+            print("   Transaction ID: \(interceptRequest.transactionId)")
+            print("   Waiting for user action...")
+            
+            // Store as pending
+            let transaction = NetworkTransaction(
+                id: interceptRequest.transactionId,
+                request: interceptRequest.request,
+                response: nil,
+                state: .pending,
+                modified: false
+            )
+            TransactionStore.shared.add(transaction)
+            
+            // For now, auto-approve after short delay (will be replaced with UI interaction)
+            // This demonstrates the flow - in production, the desktop UI will make the decision
+            DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) {
+                print("✅ Auto-approving (no UI yet) - forwarding original request")
+            }
+            
+            // Send response to approve forwarding
+            let encoder = JSONEncoder()
+            let response = InterceptResponse(
+                transactionId: interceptRequest.transactionId,
+                action: .forward,
+                modifiedRequest: nil,
+                modifiedResponse: nil
+            )
+            let responseData = try encoder.encode(response)
+            sendJSON(context: context, statusCode: .ok, rawData: responseData)
+            
+        } catch {
+            sendError(context: context, message: "Failed to decode intercept request: \(error.localizedDescription)")
+        }
+    }
+    
+    private func handleApproveRequest(context: ChannelHandlerContext, head: HTTPRequestHead, uri: String, body: ByteBuffer?) {
+        // Extract transaction ID from URI
+        let components = uri.split(separator: "/")
+        guard components.count >= 2,
+              let transactionId = UUID(uuidString: String(components[1])) else {
+            sendError(context: context, message: "Invalid transaction ID")
+            return
+        }
+        
+        // Check if there's a modified request in the body
+        var modifiedRequest: RequestModel? = nil
+        if let body = body, var bodyBuffer = body as ByteBuffer? {
+            if let bytes = bodyBuffer.readBytes(length: bodyBuffer.readableBytes) {
+                let data = Data(bytes)
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+                modifiedRequest = try? decoder.decode(RequestModel.self, from: data)
+            }
+        }
+        
+        // Update transaction state
+        if let transaction = TransactionStore.shared.getTransaction(id: transactionId) {
+            var updatedTransaction = transaction
+            updatedTransaction.state = .approved
+            if let modified = modifiedRequest {
+                updatedTransaction.request = modified
+                updatedTransaction.modified = true
+            }
+            TransactionStore.shared.update(updatedTransaction)
+            
+            print("✅ Approved: \(updatedTransaction.request.method) \(updatedTransaction.request.url)")
+            if updatedTransaction.modified {
+                print("   (Modified)")
+            }
+            
+            sendJSON(context: context, statusCode: .ok, data: ["status": "approved"])
+        } else {
+            sendError(context: context, message: "Transaction not found")
+        }
+    }
+    
+    private func handleRejectRequest(context: ChannelHandlerContext, head: HTTPRequestHead, uri: String) {
+        // Extract transaction ID from URI
+        let components = uri.split(separator: "/")
+        guard components.count >= 2,
+              let transactionId = UUID(uuidString: String(components[1])) else {
+            sendError(context: context, message: "Invalid transaction ID")
+            return
+        }
+        
+        // Update transaction state
+        if let transaction = TransactionStore.shared.getTransaction(id: transactionId) {
+            var updatedTransaction = transaction
+            updatedTransaction.state = .rejected
+            TransactionStore.shared.update(updatedTransaction)
+            
+            print("🚫 Rejected: \(updatedTransaction.request.method) \(updatedTransaction.request.url)")
+            
+            sendJSON(context: context, statusCode: .ok, data: ["status": "rejected"])
+        } else {
+            sendError(context: context, message: "Transaction not found")
+        }
+    }
+    
+    private func handleGetPendingTransactions(context: ChannelHandlerContext, head: HTTPRequestHead) {
+        let pending = TransactionStore.shared.getPending()
+        
+        do {
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            let data = try encoder.encode(pending)
+            
+            sendJSON(context: context, statusCode: .ok, rawData: data)
+        } catch {
+            sendError(context: context, message: "Failed to encode pending transactions: \(error.localizedDescription)")
         }
     }
     
