@@ -49,8 +49,29 @@ public class MyBurpURLProtocol: URLProtocol {
         
         MyBurpURLProtocol.setProperty(true, forKey: MyBurpURLProtocol.requestIDKey, in: newRequest)
         
-        // Capture the request
-        captureRequest(request)
+        // Capture the request and potentially get a modified version
+        let finalRequest = captureRequest(request)
+        
+        // Check if request was rejected
+        if finalRequest == nil {
+            let error = NSError(
+                domain: NSURLErrorDomain,
+                code: NSURLErrorCancelled,
+                userInfo: [NSLocalizedDescriptionKey: "Request was rejected by MyBurp"]
+            )
+            client?.urlProtocol(self, didFailWithError: error)
+            return
+        }
+        
+        // Apply modifications to the request if any
+        if let modifiedRequest = finalRequest {
+            if let url = URL(string: modifiedRequest.url) {
+                newRequest.url = url
+            }
+            newRequest.httpMethod = modifiedRequest.method
+            newRequest.allHTTPHeaderFields = modifiedRequest.headers
+            newRequest.httpBody = modifiedRequest.body
+        }
         
         // Create a session to perform the actual request
         let session = URLSession(configuration: .default)
@@ -88,7 +109,7 @@ public class MyBurpURLProtocol: URLProtocol {
     
     // MARK: - Capture Methods
     
-    private func captureRequest(_ request: URLRequest) {
+    private func captureRequest(_ request: URLRequest) -> RequestModel? {
         let requestModel = RequestModel(
             url: request.url?.absoluteString ?? "",
             method: request.httpMethod ?? "GET",
@@ -98,7 +119,9 @@ public class MyBurpURLProtocol: URLProtocol {
         
         // Store the request ID for later matching with response
         requestID = requestModel.id
-        NetworkInterceptor.shared.recordRequest(requestModel)
+        
+        // Record request and potentially get modified version
+        return NetworkInterceptor.shared.recordRequest(requestModel)
     }
     
     private func captureResponse(_ response: HTTPURLResponse, data: Data?) {

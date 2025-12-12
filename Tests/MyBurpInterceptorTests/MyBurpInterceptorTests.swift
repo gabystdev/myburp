@@ -84,7 +84,7 @@ final class MyBurpInterceptorTests: XCTestCase {
     
     func testServerConfiguration() {
         let serverURL = URL(string: "http://localhost:8080")!
-        MyBurp.configureServer(url: serverURL, enabled: true)
+        MyBurp.configureServer(url: serverURL, mode: .passive)
         
         // Wait for async configuration to complete
         let expectation = XCTestExpectation(description: "Wait for configuration")
@@ -94,7 +94,29 @@ final class MyBurpInterceptorTests: XCTestCase {
         wait(for: [expectation], timeout: 1.0)
         
         // Verify configuration was set
-        XCTAssertEqual(NetworkInterceptor.shared.serverURL, serverURL)
-        XCTAssertTrue(NetworkInterceptor.shared.isServerEnabled)
+        let config = NetworkInterceptor.shared.configuration
+        XCTAssertEqual(config.serverURL, serverURL)
+        XCTAssertEqual(config.interceptMode, .passive)
+    }
+    
+    func testInterceptModeConfiguration() {
+        var config = MyBurpConfiguration()
+        config.serverURL = URL(string: "http://localhost:8080")
+        config.interceptMode = .interceptRequests
+        config.timeout = 15.0
+        
+        MyBurp.configure(config)
+        
+        // Wait for async configuration to complete
+        let expectation = XCTestExpectation(description: "Wait for configuration")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            expectation.fulfill()
+        }
+        wait(for: [expectation], timeout: 1.0)
+        
+        // Verify configuration
+        let savedConfig = NetworkInterceptor.shared.configuration
+        XCTAssertEqual(savedConfig.interceptMode, .interceptRequests)
+        XCTAssertEqual(savedConfig.timeout, 15.0)
     }
 }
