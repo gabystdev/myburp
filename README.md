@@ -1,22 +1,30 @@
-# MyBurp - iOS Network Interceptor + Desktop Server
+# MyBurp - Professional iOS Network Traffic Interceptor
 
-A lightweight iOS network interceptor library similar to Wormholy, designed to capture and forward HTTP/HTTPS requests to a desktop application for inspection and modification.
+A powerful iOS network interceptor with desktop modification capabilities, similar to Burp Suite and Charles Proxy. Intercept, inspect, and modify HTTP/HTTPS requests in real-time.
 
 ## Features
 
-- 🔍 **Network Interception**: Automatically intercept all HTTP/HTTPS requests made by your iOS app
-- 📡 **Desktop Server**: NIO-based HTTP server for receiving intercepted traffic
-- 🚀 **Simple API**: Easy to integrate with just a few lines of code
-- 🧪 **Lightweight**: Minimal implementation without unnecessary overhead
-- 📦 **Swift Package Manager**: Easy integration via SPM
-- 🖥️ **REST API**: Query and manage intercepted transactions
+### 🔥 Core Capabilities
+- 🔍 **Network Interception**: Automatically intercept all HTTP/HTTPS requests using URLProtocol
+- ✏️ **Request/Response Modification**: Edit requests before they're sent, modify responses
+- 🚦 **Multiple Intercept Modes**: Passive monitoring or active interception with approval
+- 📡 **Desktop Server**: NIO-based HTTP server with full REST API
+- 🖥️ **Professional SwiftUI App**: Beautiful macOS app for managing intercepted traffic
+- 📦 **Easy Integration**: Simple API with xcconfig/Info.plist configuration support
+
+### 🎯 Intercept Modes
+- **Passive**: Capture traffic without blocking (like Wormholy)
+- **Intercept Requests**: Block requests and wait for approval/modification (like Burp)
+- **Intercept Responses**: Block responses for modification
+- **Intercept All**: Full control over both requests and responses
 
 ## Architecture
 
-MyBurp consists of two main components:
+MyBurp consists of three main components:
 
-1. **iOS Interceptor Library**: Captures network traffic and sends it to a desktop server
-2. **Desktop Server Application**: NIO-based HTTP server that receives and stores intercepted traffic
+1. **iOS Interceptor Library** (`MyBurpInterceptor`): URLProtocol-based interceptor with blocking/modification support
+2. **Desktop Server** (`MyBurpServer`): NIO-based HTTP server handling approval/rejection
+3. **SwiftUI Desktop App** (`MyBurpApp`): Professional UI for inspecting and modifying traffic
 
 ## Installation
 
@@ -35,26 +43,21 @@ Or in Xcode:
 2. Enter the repository URL: `https://github.com/gabystdev/myburp`
 3. Select version requirements
 
-## Usage
+## Quick Start
 
-### Basic Setup
-
-In your iOS app, start the interceptor early in your app's lifecycle:
+### iOS App - Passive Mode (Just Capture)
 
 ```swift
 import MyBurpInterceptor
 
-// In your AppDelegate or SwiftUI App struct
 @main
 struct MyApp: App {
     init() {
-        // Start intercepting network requests
         MyBurp.start()
-        
-        // Optional: Configure desktop server connection
-        if let serverURL = URL(string: "http://localhost:8080") {
-            MyBurp.configureServer(url: serverURL, enabled: true)
-        }
+        MyBurp.configureServer(
+            url: URL(string: "http://192.168.1.100:8080")!,
+            mode: .passive
+        )
     }
     
     var body: some Scene {
@@ -65,35 +68,168 @@ struct MyApp: App {
 }
 ```
 
-### UIKit Setup
-
-For UIKit apps, add to your `AppDelegate`:
+### iOS App - Intercept Mode (With Modification)
 
 ```swift
-import UIKit
 import MyBurpInterceptor
 
-@UIApplicationMain
-class AppDelegate: UIResponder, UIApplicationDelegate {
-    
-    func application(_ application: UIApplication, 
-                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Start intercepting
+@main
+struct MyApp: App {
+    init() {
         MyBurp.start()
-        
-        // Configure server (optional)
-        if let serverURL = URL(string: "http://192.168.1.100:8080") {
-            MyBurp.configureServer(url: serverURL, enabled: true)
+        MyBurp.configureServer(
+            url: URL(string: "http://192.168.1.100:8080")!,
+            mode: .interceptRequests  // Blocks until approved!
+        )
+    }
+    
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
         }
-        
-        return true
     }
 }
 ```
 
-### Access Intercepted Traffic
+### iOS App - Easy Configuration via Info.plist
 
-You can access intercepted network transactions programmatically:
+Add to your `Info.plist`:
+```xml
+<key>MyBurpServerURL</key>
+<string>http://192.168.1.100:8080</string>
+<key>MyBurpInterceptMode</key>
+<string>interceptRequests</string>
+<key>MyBurpTimeout</key>
+<real>30.0</real>
+```
+
+Then just:
+```swift
+MyBurp.startWithConfiguration()
+```
+
+### Desktop Server
+
+```bash
+# Start the server
+swift run MyBurpServer
+
+# Server listens on port 8080
+# iOS app connects and sends traffic
+```
+
+### Desktop SwiftUI App
+
+The SwiftUI app provides a professional UI for:
+- Viewing all intercepted traffic in real-time
+- Inspecting request/response details
+- **Modifying requests inline** (headers, body, method, URL)
+- **Approving or rejecting** intercepted requests
+- Filtering and searching transactions
+
+See `MyBurpApp/README.md` for setup instructions.
+
+## How It Works
+
+### Passive Mode (Default)
+1. iOS app makes HTTP request
+2. URLProtocol intercepts it
+3. Request is captured and sent to server
+4. Original request proceeds normally
+5. Response is captured when it returns
+
+### Intercept Mode (Burp-like)
+1. iOS app makes HTTP request
+2. URLProtocol intercepts it
+3. Request is sent to server and **iOS app blocks**
+4. Desktop app shows request in UI
+5. User can modify headers/body/URL
+6. User approves or rejects
+7. Server sends response back to iOS
+8. iOS proceeds with (possibly modified) request
+
+## Configuration Options
+
+### Intercept Modes
+```swift
+.passive              // Just capture, don't block
+.interceptRequests    // Block requests for approval
+.interceptResponses   // Block responses for modification  
+.interceptAll         // Block both requests and responses
+```
+
+### Full Configuration
+```swift
+var config = MyBurpConfiguration()
+config.serverURL = URL(string: "http://192.168.1.100:8080")
+config.interceptMode = .interceptRequests
+config.timeout = 30.0  // Timeout for pending requests
+MyBurp.configure(config)
+```
+
+### xcconfig Configuration
+Create `MyBurp.xcconfig`:
+```
+MYBURP_SERVER_URL = http:/192.168.1.100:8080
+MYBURP_INTERCEPT_MODE = interceptRequests
+MYBURP_TIMEOUT = 30.0
+```
+
+Add to `Info.plist`:
+```xml
+<key>MyBurpServerURL</key>
+<string>$(MYBURP_SERVER_URL)</string>
+<key>MyBurpInterceptMode</key>
+<string>$(MYBURP_INTERCEPT_MODE)</string>
+<key>MyBurpTimeout</key>
+<real>$(MYBURP_TIMEOUT)</real>
+```
+
+## Desktop Server API
+
+The NIO-based server provides these endpoints:
+
+- `POST /intercept` - Receive completed transactions (passive mode)
+- `POST /intercept-request` - Receive blocking requests (intercept mode)
+- `POST /approve/:id` - Approve a pending request (optionally with modifications)
+- `POST /reject/:id` - Reject a pending request
+- `GET /transactions` - Get all transactions
+- `GET /pending` - Get only pending transactions
+- `DELETE /transactions` - Clear all transactions
+
+### Example: Approving a Modified Request
+
+```bash
+curl -X POST http://localhost:8080/approve/TRANSACTION_ID \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://api.example.com/modified",
+    "method": "POST",
+    "headers": {"X-Custom": "Modified"},
+    "body": null
+  }'
+```
+
+## Desktop SwiftUI App
+
+Professional macOS app with:
+
+- **Real-time transaction list** with auto-refresh
+- **Full request/response inspector** with syntax highlighting
+- **Inline editor** for modifying requests
+- **Approve/Reject buttons** for pending requests
+- **Filtering and search**
+- **Keyboard shortcuts** (⌘R, ⌘K, etc.)
+
+To use:
+1. Create new macOS App in Xcode
+2. Add MyBurp package dependency
+3. Copy SwiftUI files from `MyBurpApp/Sources/`
+4. Build and run
+
+## Access Intercepted Traffic Programmatically
+
+You can access intercepted network transactions in your iOS app:
 
 ```swift
 // Get all intercepted transactions
@@ -101,6 +237,10 @@ let transactions = MyBurp.getTransactions()
 
 for transaction in transactions {
     print("Request: \(transaction.request.method) \(transaction.request.url)")
+    print("State: \(transaction.state)")
+    if transaction.modified {
+        print("Request was modified!")
+    }
     if let response = transaction.response {
         print("Response: \(response.statusCode)")
     }
