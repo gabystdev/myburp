@@ -101,12 +101,14 @@ public class NetworkInterceptor {
         
         // Block if needed and wait for approval
         if shouldBlock {
-            if let semaphore = queue.sync(execute: { pendingRequests[request.id] }) {
+            let semaphore = queue.sync { pendingRequests[request.id] }
+            
+            if let semaphore = semaphore {
                 // Wait for approval or timeout
                 let timeout = DispatchTime.now() + configuration.timeout
                 let result = semaphore.wait(timeout: timeout)
                 
-                _ = queue.sync(flags: .barrier) {
+                queue.sync(flags: .barrier) {
                     pendingRequests.removeValue(forKey: request.id)
                 }
                 
@@ -116,8 +118,8 @@ public class NetworkInterceptor {
                 }
                 
                 // Get the possibly modified request
-                if let index = queue.sync(execute: { transactionMap[request.id] }),
-                   index < queue.sync(execute: { transactions.count }) {
+                let index = queue.sync { transactionMap[request.id] }
+                if let index = index, index < queue.sync(execute: { transactions.count }) {
                     finalRequest = queue.sync { transactions[index].request }
                 }
             }

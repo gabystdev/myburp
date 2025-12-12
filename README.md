@@ -170,7 +170,7 @@ MyBurp.configure(config)
 ### xcconfig Configuration
 Create `MyBurp.xcconfig`:
 ```
-MYBURP_SERVER_URL = http:/192.168.1.100:8080
+MYBURP_SERVER_URL = http://192.168.1.100:8080
 MYBURP_INTERCEPT_MODE = interceptRequests
 MYBURP_TIMEOUT = 30.0
 ```

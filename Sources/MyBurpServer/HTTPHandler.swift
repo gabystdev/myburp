@@ -134,17 +134,15 @@ final class HTTPHandler: ChannelInboundHandler {
             )
             TransactionStore.shared.add(transaction)
             
-            // For now, auto-approve after short delay (will be replaced with UI interaction)
-            // This demonstrates the flow - in production, the desktop UI will make the decision
-            DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) {
-                print("✅ Auto-approving (no UI yet) - forwarding original request")
-            }
+            // TODO: In production, desktop UI will make the approval decision
+            // For now, we auto-approve to demonstrate the flow
+            // The SwiftUI desktop app provides the UI for manual approval
             
             // Send response to approve forwarding
             let encoder = JSONEncoder()
             let response = InterceptResponse(
                 transactionId: interceptRequest.transactionId,
-                action: .forward,
+                action: .forward,  // Auto-approve: forward original request
                 modifiedRequest: nil,
                 modifiedResponse: nil
             )
